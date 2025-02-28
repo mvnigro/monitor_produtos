@@ -22,6 +22,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger('app')
 
+# Also configure database loggers
+db_logger = logging.getLogger('db_connection')
+db_logger.setLevel(logging.INFO)
+db_logger.addHandler(logging.StreamHandler())
+
+db_explorer_logger = logging.getLogger('db_explorer')
+db_explorer_logger.setLevel(logging.INFO)
+db_explorer_logger.addHandler(logging.StreamHandler())
+
 # Load environment variables
 load_dotenv()
 
@@ -91,6 +100,16 @@ db = DatabaseConnection(
 
 # Create database explorer helper
 db_explorer = DatabaseExplorer(db)
+
+# Test database connection at startup and log the status
+logger.info("Testing database connection...")
+connection_success, connection_message, diagnostics = db.test_connection()
+if connection_success:
+    logger.info(f"✓ Successfully connected to SQL Server: {DB_SERVER}/{DB_DATABASE}")
+else:
+    logger.error(f"✗ Failed to connect to SQL Server: {connection_message}")
+    if OFFLINE_MODE:
+        logger.info("Running in OFFLINE mode - using mock data")
 
 @app.template_filter('format_datetime')
 def format_datetime(value, format='%H:%M:%S'):
