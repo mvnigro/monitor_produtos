@@ -1,0 +1,82 @@
+/* Print styles for completed orders report */
+@media print {
+    /* Hide non-printable elements */
+    .navbar,
+    .btn,
+    .input-group,
+    .status-indicator,
+    .last-update,
+    .delete-order {
+        display: none !important;
+    }
+
+    /* Ensure white background and black text */
+    body {
+        background-color: white;
+        color: black;
+        margin: 0;
+        padding: 15px;
+    }
+
+    /* Header styling */
+    header {
+        background-color: white !important;
+        color: #005851 !important;
+        padding: 0 0 20px 0 !important;
+        margin-bottom: 20px !important;
+        border-bottom: 2px solid #005851;
+    }
+
+    /* Summary cards styling */
+    .card {
+        border: 1px solid #ddd !important;
+        break-inside: avoid;
+    }
+
+    .card-title {
+        color: #005851 !important;
+    }
+
+    /* Table styling */
+    .table {
+        width: 100% !important;
+        margin-bottom: 1rem;
+        border-collapse: collapse !important;
+    }
+
+    .table th {
+        background-color: #f8f9fa !important;
+        color: #005851 !important;
+        border-bottom: 2px solid #005851 !important;
+    }
+
+    .table td {
+        border-bottom: 1px solid #ddd !important;
+    }
+
+    .table tr:nth-child(even) {
+        background-color: #f8f9fa !important;
+    }
+
+    /* Ensure table content doesn't break across pages */
+    tbody tr {
+        break-inside: avoid;
+    }
+
+    /* Add page numbers */
+    @page {
+        margin: 2cm;
+    }
+
+    /* Company branding footer */
+    body::after {
+        content: "Monitor de Produtos em Espera - Relatório de Pedidos Completados";
+        display: block;
+        text-align: center;
+        font-size: 10px;
+        color: #666;
+        margin-top: 30px;
+        border-top: 1px solid #ddd;
+        padding-top: 10px;
+    }
+}

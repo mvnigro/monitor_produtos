@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estatísticas de Produtos - Monitor de Produtos em Espera</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="bg-primary text-white p-3 mb-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">Estatísticas de Produtos em Espera</h1>
+                <div class="d-flex align-items-center">
+                    <div class="status-indicator me-3">
+                        {% if connection_status == 'connected' %}
+                            <span class="badge bg-success"><i class="bi bi-wifi"></i> Conectado</span>
+                        {% elif connection_status == 'disconnected' %}
+                            <span class="badge bg-danger"><i class="bi bi-wifi-off"></i> Desconectado</span>
+                        {% elif connection_status == 'offline' %}
+                            <span class="badge bg-warning"><i class="bi bi-cloud-slash"></i> Modo Offline</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-question-circle"></i> Status Desconhecido</span>
+                        {% endif %}
+                    </div>
+                    <div class="last-update">
+                        <small>
+                            <i class="bi bi-clock"></i> Última atualização: {{ last_update }}
+                            {% if is_cache %}
+                                <span class="badge bg-info ms-1">Cache</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 shadow-sm">
+            <div class="container-fluid">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="bi bi-list-check"></i> Pedidos Pendentes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/products"><i class="bi bi-bar-chart"></i> Estatísticas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/completed"><i class="bi bi-check-circle"></i> Pedidos Completados</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="d-flex">
+                    <button id="refreshBtn" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Charts Section -->
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart-line"></i> Produtos Mais Aguardados</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container" style="position: relative; height:400px;">
+                            <canvas id="productsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="col-lg-4 mb-4">
+                <div class="row h-100">
+                    <div class="col-12 mb-4">
+                        <div class="card shadow-sm border-primary">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-box-seam"></i> Total de Produtos em Espera</h5>
+                                <p class="card-text display-4" id="totalProducts">Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 mb-4">
+                        <div class="card shadow-sm border-warning">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-people"></i> Total de Clientes Afetados</h5>
+                                <p class="card-text display-4" id="totalClients">Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="card shadow-sm border-info">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-clock-history"></i> Tempo Médio de Espera</h5>
+                                <p class="card-text display-4" id="avgWaitTime">Calculando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Products Table -->
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light py-1">
+                        <h5 class="mb-0"><i class="bi bi-table"></i> Top 10 Produtos Mais Aguardados</h5>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped table-sm" id="topProductsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Produto</th>
+                                        <th>Código</th>
+                                        <th>Qtd. Clientes</th>
+                                        <th>Última Ocorrência</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topProductsTableBody">
+                                    <tr>
+                                        <td colspan="5" class="text-center">Carregando dados...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trend Analysis -->
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tendência de Espera por Produto</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container" style="position: relative; height:300px;">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-5 p-3 text-center text-muted">
+            <small>Monitor de Produtos em Espera &copy; {{ now.year }}</small>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/products.js') }}"></script>
+</body>
+</html>

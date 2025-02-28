@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos Completados - Monitor de Produtos em Espera</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}" media="print">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="bg-primary text-white p-3 mb-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">Pedidos Completados - {{ report_date }}</h1>
+                <div class="d-flex align-items-center">
+                    <div class="status-indicator me-3">
+                        {% if connection_status == 'connected' %}
+                            <span class="badge bg-success"><i class="bi bi-wifi"></i> Conectado</span>
+                        {% elif connection_status == 'disconnected' %}
+                            <span class="badge bg-danger"><i class="bi bi-wifi-off"></i> Desconectado</span>
+                        {% elif connection_status == 'offline' %}
+                            <span class="badge bg-warning"><i class="bi bi-cloud-slash"></i> Modo Offline</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-question-circle"></i> Status Desconhecido</span>
+                        {% endif %}
+                    </div>
+                    <div class="last-update">
+                        <small>
+                            <i class="bi bi-clock"></i> Última atualização: {{ last_update }}
+                            {% if is_cache %}
+                                <span class="badge bg-info ms-1">Cache</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 shadow-sm">
+            <div class="container-fluid">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="bi bi-list-check"></i> Pedidos Pendentes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/products"><i class="bi bi-bar-chart"></i> Estatísticas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/completed"><i class="bi bi-check-circle"></i> Pedidos Completados</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="d-flex">
+                    <!-- Date selector -->
+                    <div class="me-2">
+                        <input type="date" id="dateSelector" class="form-control form-control-sm" value="{{ report_date_iso }}">
+                    </div>
+                    <button id="refreshBtn" class="btn btn-outline-primary btn-sm me-2">
+                        <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    </button>
+                    <button id="printReportBtn" class="btn btn-outline-primary btn-sm" style="background-color: #005851; color: white;">
+                        <i class="bi bi-printer"></i> Imprimir Relatório
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Summary Cards -->
+            <div class="col-12 mb-4">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm border-success h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-check-circle"></i> Total de Pedidos Completados</h5>
+                                <p class="card-text display-4">{{ completed_orders|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm border-info h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-people"></i> Funcionários Envolvidos</h5>
+                                <p class="card-text display-4">{{ employees|length }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm border-warning h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-calendar-check"></i> Data</h5>
+                                <p class="card-text display-4">{{ report_date }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Completed Orders Table -->
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-check-circle"></i> Pedidos Completados</h5>
+                            <div class="input-group input-group-sm" style="width: 300px;">
+                                <input type="text" id="searchInput" class="form-control" placeholder="Buscar pedidos...">
+                                <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="completedTable">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="sortable" data-sort="product_name">Produto <i class="bi bi-arrow-down-up"></i></th>
+                                        <th scope="col" class="sortable" data-sort="product_code">Código <i class="bi bi-arrow-down-up"></i></th>
+                                        <th scope="col" class="sortable" data-sort="client_name">Cliente <i class="bi bi-arrow-down-up"></i></th>
+                                        <th scope="col" class="sortable" data-sort="completed_by">Completado Por <i class="bi bi-arrow-down-up"></i></th>
+                                        <th scope="col" class="sortable" data-sort="timestamp">Horário <i class="bi bi-arrow-down-up"></i></th>
+                                        <th scope="col">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in completed_orders %}
+                                    <tr>
+                                        <td>{{ order.product_name }}</td>
+                                        <td>{{ order.product_code }}</td>
+                                        <td>{{ order.client_name }}</td>
+                                        <td>{{ order.completed_by }}</td>
+                                        <td>{{ order.timestamp|format_datetime('%H:%M:%S') }}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-danger delete-order" data-order-id="{{ order.id }}" data-product-name="{{ order.product_name }}" data-client-name="{{ order.client_name }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">Nenhum pedido completado encontrado para esta data.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Date selector functionality
+            const dateSelector = document.getElementById('dateSelector');
+            dateSelector.addEventListener('change', function() {
+                window.location.href = '/completed?date=' + this.value;
+            });
+
+            // Refresh button functionality
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.addEventListener('click', function() {
+                window.location.reload();
+            });
+            
+            // Print report button functionality
+            const printReportBtn = document.getElementById('printReportBtn');
+            printReportBtn.addEventListener('click', function() {
+                window.print();
+            });
+            
+            // Delete order functionality
+            const deleteButtons = document.querySelectorAll('.delete-order');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const orderId = this.getAttribute('data-order-id');
+                    const productName = this.getAttribute('data-product-name');
+                    const clientName = this.getAttribute('data-client-name');
+                    
+                    if (confirm(`Deseja realmente excluir o pedido de ${productName} para ${clientName}?`)) {
+                        // Show loading state
+                        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                        this.disabled = true;
+                        
+                        // Send delete request
+                        fetch('/api/delete-order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                order_id: orderId,
+                                report_date: dateSelector.value
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Reload the page to reflect the changes
+                                window.location.reload();
+                            } else {
+                                alert('Erro ao excluir pedido: ' + data.error);
+                                // Reset button
+                                this.innerHTML = '<i class="bi bi-trash"></i>';
+                                this.disabled = false;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error deleting order:', error);
+                            alert('Erro ao excluir pedido. Por favor, tente novamente.');
+                            // Reset button
+                            this.innerHTML = '<i class="bi bi-trash"></i>';
+                            this.disabled = false;
+                        });
+                    }
+                });
+            });
+
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const table = document.getElementById('completedTable');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+
+            function performSearch() {
+                const query = searchInput.value.toLowerCase();
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (row.cells.length <= 1) continue; // Skip empty state row
+                    
+                    const text = row.textContent.toLowerCase();
+                    if (text.includes(query)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            }
+
+            searchButton.addEventListener('click', performSearch);
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+
+            // Sorting functionality
+            const sortableHeaders = document.querySelectorAll('.sortable');
+            let currentSort = { column: null, direction: 'asc' };
+
+            sortableHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.getAttribute('data-sort');
+                    const direction = column === currentSort.column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    
+                    // Update sort state
+                    currentSort = { column, direction };
+                    
+                    // Sort the table
+                    sortTable(column, direction);
+                });
+            });
+
+            function sortTable(column, direction) {
+                const tbody = table.getElementsByTagName('tbody')[0];
+                const rows = Array.from(tbody.getElementsByTagName('tr'));
+                
+                // Skip if we only have the empty state row
+                if (rows.length <= 1 && rows[0].cells.length <= 1) return;
+                
+                // Sort the rows
+                rows.sort((a, b) => {
+                    if (a.cells.length <= 1) return 1;
+                    if (b.cells.length <= 1) return -1;
+                    
+                    let aValue, bValue;
+                    
+                    switch(column) {
+                        case 'product_name':
+                            aValue = a.cells[0].textContent;
+                            bValue = b.cells[0].textContent;
+                            break;
+                        case 'product_code':
+                            aValue = a.cells[1].textContent;
+                            bValue = b.cells[1].textContent;
+                            break;
+                        case 'client_name':
+                            aValue = a.cells[2].textContent;
+                            bValue = b.cells[2].textContent;
+                            break;
+                        case 'completed_by':
+                            aValue = a.cells[3].textContent;
+                            bValue = b.cells[3].textContent;
+                            break;
+                        case 'timestamp':
+                            aValue = a.cells[4].textContent;
+                            bValue = b.cells[4].textContent;
+                            break;
+                    }
+                    
+                    const comparison = aValue.localeCompare(bValue);
+                    return direction === 'asc' ? comparison : -comparison;
+                });
+                
+                // Reorder the table
+                rows.forEach(row => tbody.appendChild(row));
+            }
+        });
+    </script>
+</body>
+</html>
