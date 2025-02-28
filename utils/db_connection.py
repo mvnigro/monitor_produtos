@@ -32,7 +32,7 @@ class DatabaseConnection:
     
     def get_connection_string(self):
         """Generate the connection string for SQL Server"""
-        return f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.server},{self.port};DATABASE={self.database};UID={self.username};PWD={self.password};Connection Timeout={self.timeout}"
+        return f"DRIVER={{FreeTDS}};SERVER={self.server};PORT={self.port};DATABASE={self.database};UID={self.username};PWD={self.password};TDS_Version=7.4;ClientCharset=UTF-8;Timeout={self.timeout}"
     
     def connect(self):
         """Establish a connection to the database with retry logic"""
