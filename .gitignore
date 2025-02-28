@@ -12,6 +12,7 @@ ENV/
 .env
 config.env
 *.env
+.env.optimized
 
 # Log files
 *.log
